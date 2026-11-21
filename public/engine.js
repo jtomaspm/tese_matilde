@@ -33,6 +33,7 @@ async function capture({ stage, stimulus, keys, text, kind, stopText, delay, win
       clearTimeout(deadline);
       cancelAnimationFrame(cueFrame);
       document.removeEventListener('keydown', keydown, true);
+      stage.removeEventListener('pointerdown', pointerdown);
       document.removeEventListener('visibilitychange', markInterruption);
       window.removeEventListener('blur', markInterruption);
       if (key !== null && cueMs !== null && elapsed < cueMs) cueMs = null;
@@ -42,16 +43,25 @@ async function capture({ stage, stimulus, keys, text, kind, stopText, delay, win
         cueMs: cueMs === null ? null : Math.min(precision(cueMs), windowMs - 0.01), interrupted,
       });
     }
+    function recordResponse(key, event) {
+      const received = performance.now() - onset;
+      const elapsed = event.timeStamp - onset;
+      if (received - elapsed > 50) interrupted = true;
+      if (elapsed >= 0 && elapsed < windowMs) finish(key, elapsed);
+    }
     function keydown(event) {
       if (event.altKey || event.ctrlKey || event.metaKey || event.isComposing) return;
       const key = event.code === 'Space' ? 'Space' : event.key.toLowerCase();
       if (!keys.includes(key)) return;
       event.preventDefault();
-      if (event.repeat) return;
-      const received = performance.now() - onset;
-      const elapsed = event.timeStamp - onset;
-      if (received - elapsed > 50) interrupted = true;
-      if (elapsed >= 0 && elapsed < windowMs) finish(key, elapsed);
+      if (!event.repeat) recordResponse(key, event);
+    }
+    function pointerdown(event) {
+      if (!event.isPrimary || event.button !== 0) return;
+      event.preventDefault();
+      const { left, width } = stage.getBoundingClientRect();
+      const key = keys.length === 1 || event.clientX < left + width / 2 ? keys[0] : keys[1];
+      recordResponse(key, event);
     }
     function stopFrame() {
       const now = performance.now();
@@ -71,6 +81,7 @@ async function capture({ stage, stimulus, keys, text, kind, stopText, delay, win
       finish(null, null);
     }, windowMs);
     document.addEventListener('keydown', keydown, true);
+    stage.addEventListener('pointerdown', pointerdown);
     document.addEventListener('visibilitychange', markInterruption);
     window.addEventListener('blur', markInterruption);
     if (delay !== null) cueFrame = requestAnimationFrame(stopFrame);
@@ -105,17 +116,17 @@ export async function runBlock(type, config, block, stage, indicator) {
     let message = '';
     let feedback = 0;
     if (!stopTask) {
-      if (noGo && result.key !== null) message = 'Não devia premir a tecla.';
-      if (!noGo && result.key === null) message = 'Devia premir a tecla.';
+      if (noGo && result.key !== null) message = 'Não devia responder.';
+      if (!noGo && result.key === null) message = 'Era necessário responder.';
       feedback = config.feedbackMs;
     } else if (trial.condition === 'stop' && result.cueMs !== null && result.key !== null) {
-      message = 'Não devia premir a tecla.';
+      message = 'Não devia responder.';
       feedback = 1250;
     } else if (trial.condition !== 'stop' && result.key === null) {
-      message = 'Devia premir a tecla.';
+      message = 'Era necessário responder.';
       feedback = 1250;
     } else if (result.key !== null && result.key !== expected) {
-      message = 'Tecla incorreta.';
+      message = 'Resposta incorreta.';
       feedback = 2000;
     }
     if (message && feedback) {

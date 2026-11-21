@@ -9,6 +9,8 @@ import { initializeDatabase } from './lib/database.mjs';
 import { types, defaults, InputError, string, validateConfig, makePlan } from './lib/protocol.mjs';
 import { score, describe, csv, timingCsv } from './lib/results.mjs';
 
+import { escape as escapeHtml } from './public/ui.js';
+
 const dataDir = resolve(process.env.DATA_DIR || 'data');
 const publicDir = fileURLToPath(new URL('./public/', import.meta.url));
 const setupToken = process.env.SETUP_TOKEN;
@@ -44,7 +46,10 @@ function transaction(fn) {
 transaction(() => {
   if (get('SELECT id FROM tests LIMIT 1')) return;
   for (const type of ['gonogo', 'stop']) {
-    run('INSERT INTO tests (type, config) VALUES (?, ?)', type, JSON.stringify(defaults[type]));
+    const config = JSON.stringify(defaults[type]);
+    const test = run('INSERT INTO tests (type, config) VALUES (?, ?)', type, config);
+    run("INSERT INTO invitations (code,test_id,config,label,created_at) VALUES (?,?,?,'Website',?)",
+      token(), test.lastInsertRowid, config, nowISO());
   }
 });
 
@@ -56,7 +61,6 @@ class HttpError extends Error {
 }
 const notFound = () => new HttpError(404, 'Página ou recurso indisponível.');
 const missingInvite = () => new HttpError(404, 'Este convite é inválido ou foi desativado.');
-const usedInvite = () => new HttpError(409, 'Este convite já foi utilizado.');
 
 async function readJson(request) {
   if (!/^application\/json(?:\s*;|$)/i.test(request.headers['content-type'] || '')) {
@@ -214,11 +218,13 @@ function saveTest(type, inputs, id, editToken) {
   });
 }
 
+const usageCount = '(SELECT count(*) FROM submissions s WHERE s.code = i.code)';
+
 function invitation(code) {
   if (typeof code !== 'string' || !/^[\w-]{32}$/.test(code)) throw missingInvite();
-  const row = get(`SELECT i.*, t.type, s.id AS participant FROM invitations i
+  const row = get(`SELECT i.*, t.type FROM invitations i
     JOIN tests t ON t.id = i.test_id AND t.deleted_at IS NULL
-    LEFT JOIN submissions s ON s.code = i.code WHERE i.code = ?`, code);
+    WHERE i.code = ?`, code);
   if (!row || row.revoked) throw missingInvite();
   return row;
 }
@@ -231,9 +237,9 @@ function submissions(id) {
 }
 
 function invitationCounts(id) {
-  return get(`SELECT count(*) AS totalInvites, count(s.id) AS completed,
-    count(*) FILTER (WHERE i.revoked = 0 AND s.id IS NULL) AS availableInvites
-    FROM invitations i LEFT JOIN submissions s ON s.code = i.code WHERE i.test_id = ?`, id);
+  return get(`SELECT count(*) AS totalInvites, coalesce(sum(${usageCount}), 0) AS completed,
+    count(*) FILTER (WHERE i.revoked = 0) AS availableInvites
+    FROM invitations i WHERE i.test_id = ?`, id);
 }
 
 function invitationPage(id, requested) {
@@ -243,8 +249,8 @@ function invitationPage(id, requested) {
   const counts = invitationCounts(id);
   const totalPages = Math.ceil(counts.totalInvites / invitationPageSize);
   const page = Math.min(requested === null ? 1 : Number(requested), Math.max(1, totalPages));
-  const invites = all(`SELECT i.code, i.label, i.created_at AS createdAt, i.revoked, s.id AS participant
-    FROM invitations i LEFT JOIN submissions s ON s.code = i.code
+  const invites = all(`SELECT i.code, i.label, i.created_at AS createdAt, i.revoked, ${usageCount} AS completed
+    FROM invitations i
     WHERE i.test_id = ? ORDER BY i.created_at DESC, i.rowid DESC LIMIT ? OFFSET ?`,
     id, invitationPageSize, (page - 1) * invitationPageSize);
   return { invites, page, pageSize: invitationPageSize, totalPages, ...counts };
@@ -252,7 +258,6 @@ function invitationPage(id, requested) {
 
 function startAttempt(code) {
   const invite = invitation(code);
-  if (invite.participant) throw usedInvite();
   run('DELETE FROM attempts WHERE expires <= ?', Date.now());
   const plan = makePlan(invite.type, JSON.parse(invite.config));
   const attempt = token();
@@ -271,7 +276,6 @@ function submit(body) {
     const attempt = get('SELECT * FROM attempts WHERE id = ? AND expires > ?', id, Date.now());
     if (!attempt) throw new HttpError(410, 'A sessão expirou. Abra novamente o convite.');
     const invite = invitation(attempt.code);
-    if (invite.participant) throw usedInvite();
     const name = string(body.name, 120, 'o nome', true);
     const email = string(body.email, 254, 'o endereço de email', true);
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new InputError('Introduza um endereço de email válido.');
@@ -290,7 +294,6 @@ async function api(request, response, url) {
   if (pathname === '/api/health' && method === 'GET') return json(response, { status: 'ok' });
   if (pathname === '/api/test' && method === 'GET') {
     const invite = invitation(searchParams.get('code'));
-    if (invite.participant) throw usedInvite();
     return json(response, { id: invite.test_id, type: invite.type, config: JSON.parse(invite.config) });
   }
   if (pathname === '/api/test/start' && method === 'POST') {
@@ -345,7 +348,7 @@ async function api(request, response, url) {
     }
     if (section === 'invitations' && method === 'POST') {
       const body = await readJson(request);
-      const label = string(body.label, 100, 'a referência do convite');
+      const label = string(body.label, 100, 'a referência do convite', true);
       const code = token();
       const createdAt = nowISO();
       transaction(() => {
@@ -353,7 +356,7 @@ async function api(request, response, url) {
         run('INSERT INTO invitations (code, test_id, config, label, created_at) VALUES (?, ?, ?, ?, ?)',
           code, id, test.config, label, createdAt);
       });
-      return json(response, { code, label, createdAt, revoked: 0, participant: null }, 201);
+      return json(response, { code, label, createdAt, revoked: 0, completed: 0 }, 201);
     }
     if (section === 'invitations' && method === 'GET') {
       testRecord(id);
@@ -361,10 +364,18 @@ async function api(request, response, url) {
     }
     if (section === 'participants' && method === 'GET') {
       testRecord(id);
+      const personId = searchParams.get('id');
+      if (personId !== null) {
+        const person = get(`SELECT s.id, s.name, s.email, s.completed_at AS completedAt, i.label,
+          i.config, s.results FROM submissions s JOIN invitations i ON i.code = s.code
+          WHERE i.test_id = ? AND s.id = ?`, id, personId);
+        if (!person) throw notFound();
+        return json(response, { ...person, config: JSON.parse(person.config), results: JSON.parse(person.results) });
+      }
       const participants = all(`SELECT s.id, s.name, s.email, s.completed_at AS completedAt, i.label
         FROM submissions s JOIN invitations i ON i.code = s.code
         WHERE i.test_id = ? ORDER BY s.completed_at DESC, s.rowid DESC`, id);
-      return json(response, { participants });
+      return json(response, { participants, counts: invitationCounts(id) });
     }
     if (method === 'GET' && ['results', 'csv', 'timing-csv'].includes(section)) {
       const test = adminTest(testRecord(id));
@@ -379,7 +390,7 @@ async function api(request, response, url) {
         return response.end(data);
       }
       const mixedConfigs = new Set(records.map(record => JSON.stringify(validateConfig(test.type, record.config)))).size > 1;
-      return json(response, { completed: records.length, mixedConfigs, stats: describe(test.type, test.config, records) });
+      return json(response, { completed: records.length, counts: invitationCounts(id), mixedConfigs, stats: describe(test.type, test.config, records) });
     }
   }
 
@@ -387,7 +398,6 @@ async function api(request, response, url) {
   if (revoke && method === 'POST') {
     await readJson(request);
     const invite = invitation(revoke[1]);
-    if (invite.participant) throw usedInvite();
     run('UPDATE invitations SET revoked = 1 WHERE code = ?', invite.code);
     return json(response, { revoked: true });
   }
@@ -412,6 +422,15 @@ createServer(async (request, response) => {
       /^\/(?:style\.css|(?:admin|participant|ui|engine)\.js)$/.test(url.pathname) ? url.pathname.slice(1) : null;
     if (!filename) throw notFound();
     response.writeHead(200, { 'Content-Type': media[extname(filename)] });
+    if (filename === 'index.html' && request.method === 'GET') {
+      const links = all(`SELECT i.code, json_extract(i.config, '$.title') AS title
+        FROM invitations i JOIN tests t ON t.id = i.test_id
+        WHERE i.label = 'Website' AND t.deleted_at IS NULL AND i.revoked = 0
+        ORDER BY title, i.created_at, i.code`);
+      const items = links.map(link => `<a href="/test?code=${encodeURIComponent(link.code)}">${escapeHtml(link.title)}</a>`).join('');
+      return response.end(readFileSync(join(publicDir, filename), 'utf8').replace('<!-- website-links -->',
+        () => items || '<p>Sem testes disponíveis.</p>'));
+    }
     response.end(request.method === 'HEAD' ? undefined : readFileSync(join(publicDir, filename)));
   } catch (error) {
     const status = error instanceof HttpError ? error.status : error instanceof InputError ? 400 : 500;

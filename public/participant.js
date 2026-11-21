@@ -9,7 +9,7 @@ let attempt;
 const responses = [];
 
 function screen(title, content, label = 'Participação no estudo') {
-  app.innerHTML = `<section class="panel stack"><p class="eyebrow">${e(label)}</p><h1>${e(title)}</h1>${content}</section>`;
+  app.innerHTML = `<section class="panel study-card"><header class="study-heading"><p class="eyebrow">${e(label)}</p><h1>${e(title)}</h1></header><div class="study-content stack">${content}</div></section>`;
   window.scrollTo(0, 0);
 }
 
@@ -18,7 +18,7 @@ function unavailable(error) {
 }
 
 async function load() {
-  if (!code) return unavailable(new Error('Abra a ligação individual que recebeu para participar.'));
+  if (!code) return unavailable(new Error('Abra a ligação do teste que recebeu para participar.'));
   try {
     test = await api('/api/test?code=' + encodeURIComponent(code));
   } catch (error) {
@@ -27,10 +27,11 @@ async function load() {
   const { config, type } = test;
   screen(config.title, `
     ${config.description ? `<p class="prose">${e(config.description)}</p>` : ''}
-    ${type === 'survey' ? '' : '<p>Para esta tarefa, utilize um computador com teclado físico. Mantenha esta janela ativa durante o teste.</p>'}
-    ${type === 'stop' ? '<p>A tarefa tem duas fases. Começa com a prática das teclas e termina com uma fase que inclui o sinal de paragem.</p>' : ''}
+    ${type === 'survey' ? '' : '<p>Pode responder com o teclado ou tocar ou clicar na área dos estímulos. Mantenha esta janela ativa durante o teste.</p>'}
+    ${type === 'stop' ? '<p>O teste tem duas fases. Começa com a prática das respostas e termina com uma fase que inclui o sinal de stop.</p>' : ''}
     ${config.notice ? `<div class="notice stack tight"><h2>Informação do estudo</h2><p class="prose">${e(config.notice)}</p></div>` : ''}
     <form id="participant" class="stack">
+      <h2>Identificação do participante</h2>
       <div class="grid-fields">
         <label class="field">Nome<input name="name" required maxlength="120" autocomplete="name"></label>
         <label class="field">Email<input name="email" type="email" required maxlength="254" autocomplete="email"></label>
@@ -38,7 +39,7 @@ async function load() {
       <p class="meta">O nome e o email serão enviados à equipa de investigação juntamente com as respostas.</p>
       ${config.notice ? '<label class="check"><input type="checkbox" required> Li a informação do estudo.</label>' : ''}
       <p class="error" role="alert" hidden></p>
-      <button class="button" type="submit">Continuar</button>
+      <button class="button" type="submit">${type === 'survey' ? 'Abrir questionário' : 'Ver instruções'}</button>
     </form>`);
   const form = app.querySelector('form');
   form.onsubmit = async event => {
@@ -73,26 +74,29 @@ function instructions(plan, position, baselineMean) {
   const base = block.block === 'baseline';
   const goNoGo = type === 'gonogo';
   const progress = goNoGo ? '' : `Fase ${position + 1} de ${plan.length}`;
-  const directional = goNoGo ? '' : `Prima ${keyLabel(config.leftKey)} quando vir «${config.leftCue}» e ${keyLabel(config.rightKey)} quando vir «${config.rightCue}». Responda o mais rapidamente possível.`;
-  const goKey = config.responseKey === 'Space' ? 'a barra de espaços' : keyLabel(config.responseKey || '');
   const standard = goNoGo
-    ? `Prima ${goKey} quando vir «${config.goCue}». Quando vir «${config.noGoCue}», aguarde sem premir a tecla.`
-    : directional + (base ? '' : ` Se a seta for substituída por «${config.stopCue}» antes de responder, não prima nenhuma tecla.`);
+    ? `Responda quando vir «${config.goCue}». Quando vir «${config.noGoCue}», aguarde sem responder.`
+    : `Responda à esquerda quando vir «${config.leftCue}» e à direita quando vir «${config.rightCue}». Responda o mais rapidamente possível.` +
+      (base ? '' : ` Se a seta for substituída por «${config.stopCue}» antes de responder, aguarde sem responder.`);
+  const controls = goNoGo
+    ? `Toque ou clique em qualquer ponto da área dos estímulos ou prima ${config.responseKey === 'Space' ? 'a barra de espaços' : keyLabel(config.responseKey)}.`
+    : `Para responder à esquerda, toque ou clique na metade esquerda da área dos estímulos ou prima ${keyLabel(config.leftKey)}. Para responder à direita, use a metade direita ou prima ${keyLabel(config.rightKey)}.`;
   const custom = base ? config.baselineInstructions : config.instructions;
   const average = typeof baselineMean === 'number'
     ? `<p class="notice">Tempo médio das respostas corretas na fase inicial: ${fmt(baselineMean)} ms.</p>` : '';
-  const title = goNoGo ? 'Instruções da tarefa' : base ? 'Fase 1 de 2 · Prática das teclas' : 'Fase 1 concluída';
-  const nextPhase = !goNoGo && !base ? '<h2>Fase 2 de 2 · Sinal de paragem</h2><p>Complete esta fase para enviar as respostas das duas fases.</p>' : '';
-  const startText = goNoGo ? 'Iniciar tarefa' : base ? 'Iniciar fase 1' : 'Continuar para a fase 2';
+  const title = goNoGo ? 'Instruções do teste' : base ? 'Fase 1 de 2 · Prática das respostas' : 'Fase 1 concluída';
+  const nextPhase = !goNoGo && !base ? '<h2>Fase 2 de 2 · Sinal de stop</h2><p>Complete esta fase para enviar as respostas das duas fases.</p>' : '';
+  const startText = goNoGo ? 'Iniciar teste' : base ? 'Iniciar fase 1' : 'Continuar para a fase 2';
   screen(title, `
     ${average}${nextPhase}<p class="prose">${e(custom || standard)}</p>
+    <p>${e(controls)}</p>
     <p>Após iniciar, mantenha o olhar no centro do ecrã.</p>
     <button class="button" id="begin" type="button">${startText}</button>`, config.title);
   const begin = app.querySelector('#begin');
   begin.focus();
   begin.onclick = async () => {
     screen(goNoGo ? blockNames[block.block] : `${progress} · ${blockNames[block.block]}`, `
-      <p class="meta" id="indicator"></p>
+      <p class="trial-progress" id="indicator"></p>
       <div class="stage" tabindex="-1" aria-label="Área dos estímulos"><div class="stimulus"></div></div>`, config.title);
     const stage = app.querySelector('.stage');
     stage.focus({ preventScroll: true });

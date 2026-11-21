@@ -1,6 +1,6 @@
 # Método
 
-Método is a European Portuguese web application for academic health research. Researchers configure tests, issue single-use invitations, and review descriptive statistics. Participants enter their name and email, complete the assigned test in the browser, and receive confirmation once their responses have been saved.
+Método is a European Portuguese web application for academic health research. Researchers configure tests, issue shared invitations, and review descriptive statistics. Participants enter their name and email, complete the assigned test in the browser, and receive confirmation once their responses have been saved.
 
 ## Run with Docker
 
@@ -19,9 +19,9 @@ On a system using Docker Desktop's separate context, add `--context desktop-linu
 ### First study
 
 1. Open [the homepage](http://127.0.0.1:3000/). The public page explains the project and how participation works.
-2. Select **Administração** in the homepage footer or open [the researcher area](http://127.0.0.1:3000/admin). On a fresh database, choose any nonempty admin password up to 256 characters. Subsequent visits use that password.
+2. Select **Área de investigação** in the homepage header or open [the researcher area](http://127.0.0.1:3000/admin). On a fresh database, choose any nonempty admin password up to 256 characters. Subsequent visits use that password.
 3. Select one of the two included tests or choose **Criar teste**. The builder supports Go / No-Go, Stop Signal, and questionnaires with choice, numerical rating, or open-text questions. Configure the task and add your study's participant information and instructions.
-4. Use **Gerar ligação** in the test header to generate one link per participant. The optional internal reference is visible only in the researcher area. Each link accepts one completed submission. Participants can reopen an unused link after an abandoned session. The invite can be disabled before completion. **Convites** shows 8 invitations per page, newest first.
+4. In **Convites**, enter a required reference and select **Gerar ligação**. Share the link with multiple participants. Every link accepts unlimited completions until deactivated. The **Testes** menu on the homepage lists available links with the exact reference **Website**. The two default tests each receive an unlimited Website link. Participants can reopen a link after an abandoned session. Researchers can deactivate an invite at any time. **Convites** shows 8 invitations per page, newest first.
 5. Open **Resultados** to view counts, condition-level accuracy and reaction times, or questionnaire response distributions. The CSV export includes one row per trial or question for the selected test. The **Participantes** tab shows the names and email addresses of participants with completed submissions.
 
 Use the three-dot menu beside a test name to edit or delete it. Edits apply to new invitations. Existing links and submissions keep the configuration used for that invitation. Use **Criar teste** to run a protocol separately and keep its results independent. Deleting a test removes it from the library and disables its links while retaining its records in SQLite. The CSV uses participant identifiers in place of the name and email fields. Open-text answers may contain identifiers supplied by participants.
@@ -44,7 +44,7 @@ Use Node.js 24 or newer. The app uses Node's bundled HTTP and SQLite modules, so
 
 ## Reference protocols
 
-The supplied scripts named external image files. The included versions use Portuguese text, arrows, and a fixation cross drawn by the browser. Use a physical keyboard for the cognitive tasks.
+The supplied scripts named external image files. The included versions use Portuguese text, arrows, and a fixation cross drawn by the browser. In Go / No-Go, a tap or click anywhere in the stimulus area is scored as the configured response key. In Stop Signal, the left and right halves are scored as the configured left and right keys. Participants can also use a keyboard.
 
 | Reference | Included implementation |
 | --- | --- |
@@ -66,6 +66,6 @@ A PsyToolkit replication study recovered effects for response choice and reactio
 ## Implementation and verification
 
 1. Translated the reference protocols into validated, configurable test definitions in [lib/protocol.mjs](lib/protocol.mjs).
-2. Implemented first-run password setup with scrypt, admin sessions, the test library, and invitation redemption in [server.mjs](server.mjs). [lib/database.mjs](lib/database.mjs) initializes SQLite and migrates existing data.
+2. Implemented first-run password setup with scrypt, admin sessions, the test library, and invitation redemption in [server.mjs](server.mjs). [lib/database.mjs](lib/database.mjs) initializes SQLite.
 3. Built the three Portuguese pages. [public/engine.js](public/engine.js) presents cues and captures keyboard input in the browser using a monotonic clock. [lib/results.mjs](lib/results.mjs) validates and scores the responses on the server and builds the descriptive statistics and CSV.
 4. Tested password setup, sign-in, protocol scoring, editing tests with existing invitations, duplicate submissions, disabled invitations, and CSV export with synthetic data. The short Go / No-Go browser check exercises stimulus rendering and keyboard response capture. Timing validation against physical equipment was outside the software check.

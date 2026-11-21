@@ -25,6 +25,6 @@ export function showError(element, error) {
   element.hidden = !error;
 }
 
-export const blockNames = { training: 'Treino', baseline: 'Fase inicial', stopgo: 'Fase com sinal de paragem' };
-export const conditionNames = { go: 'Go', nogo: 'No-Go', stop: 'Paragem' };
+export const blockNames = { training: 'Treino', baseline: 'Fase inicial', stopgo: 'Fase com sinal de stop' };
+export const conditionNames = { go: 'Go', nogo: 'No-Go', stop: 'Stop' };
 export const fmt = value => new Intl.NumberFormat('pt-PT', { maximumFractionDigits: 1 }).format(value);
