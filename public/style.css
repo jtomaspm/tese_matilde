@@ -293,5 +293,7 @@ caption { padding-bottom: 12px; }
 .invite-table th:nth-child(n) { width: auto; }
 @media (max-width: 480px) {
   .site-header { flex-wrap: wrap; gap: 8px; padding-block: 10px; }
-  .website-tests .dropdown-options { left: auto; right: 0; }
+  .site-actions { position: relative; }
+  .website-tests { position: static; }
+  .website-tests .dropdown-options { max-width: 100%; }
 }

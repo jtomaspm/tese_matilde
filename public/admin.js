@@ -247,20 +247,21 @@ function resultsHtml(test, stats, total) {
       <tbody>${question.distribution.map(bin => `<tr><td>${e(bin.label)}</td><td><meter min="0" max="${Math.max(1, question.count)}" value="${bin.count}" aria-hidden="true"></meter> ${bin.count}</td></tr>`).join('')}</tbody></table></div>`
         : '<p>Consulte as respostas de texto no separador Participantes.</p>'}
     </div>`).join('');
+  const showPhase = test.type === 'stop';
   return `
     <h3>Acerto por condição</h3>
-    <div class="rate-list">${stats.map(row => `<div><span>${e(blockNames[row.block])} · ${e(conditionNames[row.condition])}</span><meter aria-label="Taxa de acerto" min="0" max="1" value="${row.accuracy ?? 0}"></meter><strong>${row.accuracy === null ? '—' : fmt(row.accuracy * 100) + '%'}</strong></div>`).join('')}</div>
+    <div class="rate-list">${stats.map(row => `<div><span>${showPhase ? e(blockNames[row.block]) + ' · ' : ''}${e(conditionNames[row.condition])}</span><meter aria-label="Taxa de acerto" min="0" max="1" value="${row.accuracy ?? 0}"></meter><strong>${row.accuracy === null ? '—' : fmt(row.accuracy * 100) + '%'}</strong></div>`).join('')}</div>
     <div class="table-scroll"><table aria-label="Estatísticas por condição">
-    <thead><tr><th>Fase</th><th>Condição</th><th>Ensaios</th><th>Corretos</th><th>Erros</th><th>Acerto</th><th>Sem tecla</th><th>Sinalizados</th></tr></thead>
-    <tbody>${stats.map(row => `<tr><td>${blockNames[row.block]}</td><td>${conditionNames[row.condition]}</td><td>${row.count}</td>
+    <thead><tr>${showPhase ? '<th>Fase</th>' : ''}<th>Condição</th><th>Ensaios</th><th>Corretos</th><th>Erros</th><th>Acerto</th><th>Sem tecla</th><th>Sinalizados</th></tr></thead>
+    <tbody>${stats.map(row => `<tr>${showPhase ? `<td>${e(blockNames[row.block])}</td>` : ''}<td>${conditionNames[row.condition]}</td><td>${row.count}</td>
       <td>${row.correct}</td><td>${row.errors}</td><td>${row.accuracy === null ? '—' : fmt(100 * row.accuracy) + '%'}</td><td>${row.timeouts}</td><td>${row.interrupted}</td></tr>`).join('')}</tbody>
     </table></div>
     <h3>Tempos de reação</h3>
     <p>Os tempos são medidos desde o estímulo inicial até à tecla premida. Os ensaios sem tecla ficam sem tempo de reação.</p>
     <div class="table-scroll"><table aria-label="Tempos de reação por condição">
-    <thead><tr><th>Fase</th><th>Condição</th><th>Respostas</th><th>Com tempo</th><th>Média</th><th>Mediana</th><th>Mínimo</th><th>Máximo</th></tr></thead>
-    <tbody>${stats.flatMap(row => [['Todas', row.allTimes], ['Corretas', row.correctTimes]].map(([label, times]) => `
-      <tr><td>${blockNames[row.block]}</td><td>${conditionNames[row.condition]}</td><td>${label}</td><td>${times.count}</td>
+    <thead><tr>${showPhase ? '<th>Fase</th>' : ''}<th>Condição</th><th>Respostas</th><th>Total de ensaios</th><th>Média</th><th>Mediana</th><th>Mínimo</th><th>Máximo</th></tr></thead>
+    <tbody>${stats.flatMap(row => [['Todas', row.count, row.allTimes], ['Corretas', row.correct, row.correctTimes], ['Incorretas', row.errors, row.incorrectTimes]].map(([label, count, times]) => `
+      <tr>${showPhase ? `<td>${e(blockNames[row.block])}</td>` : ''}<td>${conditionNames[row.condition]}</td><td>${label}</td><td>${count}</td>
       <td>${millis(times.mean)}</td><td>${millis(times.median)}</td><td>${millis(times.min)}</td><td>${millis(times.max)}</td></tr>`)).join('')}</tbody>
     </table></div>`;
 }
@@ -301,11 +302,12 @@ function participantsPanel(participants) {
 
 function individualResults(type, person) {
   const { config, results } = person;
+  const showPhase = type === 'stop';
   const table = type === 'survey' ? `<dl class="answers">${results.map(({ index, answer }) => {
     const q = config.questions[index];
     return `<div><dt>${e(q.prompt)}</dt><dd class="prose">${answer === null ? 'Sem resposta' : e(q.type === 'choice' ? q.options[answer] : answer)}</dd></div>`;
-  }).join('')}</dl>` : `<div class="table-scroll"><table><caption>Resultados por ensaio</caption><thead><tr><th>Fase</th><th>Ensaio</th><th>Condição</th><th>Tecla</th><th>Acerto</th><th>Tempo de reação</th><th>Sinalizado</th></tr></thead><tbody>
-    ${results.map(r => `<tr><td>${e(blockNames[r.block])}</td><td>${r.index + 1}</td><td>${e(conditionNames[r.condition])}</td><td>${e(r.key ?? '—')}</td><td>${r.correct === null ? 'Indeterminado' : r.correct ? 'Sim' : 'Não'}</td><td>${millis(r.rt)}</td><td>${r.interrupted ? 'Sim' : 'Não'}</td></tr>`).join('')}
+  }).join('')}</dl>` : `<div class="table-scroll"><table><caption>Resultados por ensaio</caption><thead><tr>${showPhase ? '<th>Fase</th>' : ''}<th>Ensaio</th><th>Condição</th><th>Tecla</th><th>Acerto</th><th>Tempo de reação</th><th>Sinalizado</th></tr></thead><tbody>
+    ${results.map(r => `<tr>${showPhase ? `<td>${e(blockNames[r.block])}</td>` : ''}<td>${r.index + 1}</td><td>${e(conditionNames[r.condition])}</td><td>${e(r.key ?? '—')}</td><td>${r.correct === null ? 'Indeterminado' : r.correct ? 'Sim' : 'Não'}</td><td>${millis(r.rt)}</td><td>${r.interrupted ? 'Sim' : 'Não'}</td></tr>`).join('')}
     </tbody></table></div>`;
   return `<button class="button secondary compact" data-back>← Participantes</button>
     <h3 tabindex="-1">${e(person.name)}</h3><p>${e(person.email)} · ${e(date(person.completedAt))}</p>
