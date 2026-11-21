@@ -160,10 +160,8 @@ th { color: var(--muted); font-size: .875rem; }
 td:last-child { min-width: 90px; }
 .badge { display: inline-flex; padding: 3px 8px; border-radius: 6px; background: var(--pale); color: var(--navy); font-size: .875rem; }
 .badge.muted { background: var(--paper); color: var(--muted); }
-.invite-table { table-layout: fixed; min-width: 500px; }
-.invite-table th { width: 25%; }
-.invite-table th:nth-child(3) { width: 18%; }
-.invite-table th:last-child { width: 32%; }
+.invite-table { width: max-content; min-width: 100%; }
+.invite-table th { white-space: nowrap; }
 .invite-table td { height: 44px; padding-block: 6px; vertical-align: middle; white-space: nowrap; }
 .invite-reference { overflow: hidden; text-overflow: ellipsis; }
 .invite-actions { display: flex; align-items: center; gap: 4px; }
@@ -274,7 +272,9 @@ caption { padding-bottom: 12px; }
   .editor-nav button { padding: 6px; font-size: .84rem; }
   .sidebar { position: static; }
   .rate-list > div { grid-template-columns: minmax(0, 1.4fr) 1fr 3rem; gap: 5px; }
-  .detail-tab-panel table { min-width: 28rem; }
+  #panel-participants table { min-width: 28rem; }
+  #panel-results table { width: max-content; min-width: 100%; }
+  #panel-results :is(th, td) { white-space: nowrap; }
 }
 .option-row { display: flex; align-items: end; gap: 8px; margin-bottom: 10px; }
 .option-row .field { flex: 1; }
@@ -289,8 +289,6 @@ caption { padding-bottom: 12px; }
 .website-tests a:hover, .website-tests a:focus-visible { background: var(--pale); }
 .invite-form { align-items: end; max-width: none; }
 .invite-form input { flex: none; width: 100%; }
-.invite-table { min-width: 640px; table-layout: auto; }
-.invite-table th:nth-child(n) { width: auto; }
 @media (max-width: 480px) {
   .site-header { flex-wrap: wrap; gap: 8px; padding-block: 10px; }
   .site-actions { position: relative; }
