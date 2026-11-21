@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Área de investigação · Método</title>
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/admin.js"></script>
+</head>
+<body class="workspace-page admin-page">
+  <header class="workspace-header"><div class="wide-wrap header-inner">
+    <a class="brand" href="/"><span class="brand-mark" aria-hidden="true"><i></i></span>Método</a>
+    <span class="site-context">Área de investigação</span>
+    <details class="account-menu" id="account" hidden>
+      <summary class="button secondary compact">Conta</summary>
+      <div class="dropdown-options">
+        <button type="button" id="change-password">Alterar palavra-passe</button>
+        <button type="button" id="logout">Terminar sessão</button>
+      </div>
+    </details>
+  </div></header>
+  <main class="wide-wrap workspace" id="app"><p>A carregar…</p></main>
+  <dialog class="panel admin-dialog" id="password-dialog" aria-labelledby="password-title">
+    <form class="stack">
+      <h2 id="password-title">Alterar palavra-passe</h2>
+      <label class="field">Palavra-passe atual<input type="password" name="currentPassword" autocomplete="current-password" maxlength="256" required autofocus></label>
+      <label class="field">Nova palavra-passe<input type="password" name="newPassword" autocomplete="new-password" maxlength="256" required></label>
+      <label class="field">Confirmar nova palavra-passe<input type="password" name="confirmation" autocomplete="new-password" maxlength="256" required></label>
+      <p class="error" role="alert" hidden></p>
+      <div class="actions">
+        <button type="submit" class="button">Guardar palavra-passe</button>
+        <button type="button" class="button secondary" id="cancel-password">Cancelar</button>
+      </div>
+    </form>
+  </dialog>
+  <div class="toast" id="toast" hidden>
+    <div id="toast-message" role="status"></div>
+    <label class="field" id="manual-invite" hidden>Ligação do participante<input readonly></label>
+  </div>
+</body>
+</html>

@@ -1,0 +1,160 @@
+# stop signal task
+
+options
+  bitmapdir stimuli    # the folder that contains the stimuli bitmaps
+  set &d 0 # dummy variable
+  set &iti 750  # inter trial interval (ITI)
+
+bitmaps
+  frame
+  leftarrow
+  rightarrow
+  leftarrownogo
+  rightarrownogo
+  fixpoint1
+  fixpoint2
+  fixpoint3
+  wrongkey
+  shouldnothavepressed1
+  shouldnothavepressed2
+  shouldhavepressed1
+  shouldhavepressed2
+  instruction1
+  instruction2
+
+fonts
+  arial 20
+
+part nice_fixpoint
+  show bitmap fixpoint1
+  delay 75
+  show bitmap fixpoint2
+  delay 75
+  show bitmap fixpoint3
+  delay 75
+  clear -1 -2 -3
+  show bitmap fixpoint2
+  delay 75
+  clear -1
+  show bitmap fixpoint1
+  delay 200
+  clear -1
+
+table gotable
+  "go   left"  leftarrow  1
+  "go   right" rightarrow 2
+
+table nogotable
+  "nogo left"  leftarrow  1 leftarrownogo
+  "nogo right" rightarrow 2 rightarrownogo
+
+task go
+  table gotable
+  set $trialcorrect 1
+  keys b n
+  show bitmap frame #1
+  delay 500
+  part nice_fixpoint # show nice fixpoint
+  show bitmap @2 # show the arrow (the go signal)
+  readkey @3 500 # max response time 500 ms
+  clear -1
+  ### feedback
+  if STATUS == TIMEOUT
+    show bitmap shouldhavepressed1
+    delay 250
+    clear -1
+    show bitmap shouldhavepressed2
+    delay 250
+    clear -1
+    show bitmap shouldhavepressed1
+    delay 250
+    clear -1
+    show bitmap shouldhavepressed2
+    delay 250
+    clear -1
+    show bitmap shouldhavepressed1
+    delay 250
+    clear -1
+    error
+    set $trialcorrect 0
+  fi
+  if STATUS != TIMEOUT && STATUS != CORRECT
+    show bitmap wrongkey
+    delay 2000
+    clear -1
+    error
+    set $trialcorrect 0    
+  fi
+  delay &iti
+  save @1 &d RT STATUS &d &d $trialcorrect
+
+task nogo
+  table nogotable
+  set $trialcorrect 1  
+  keys b n
+  show bitmap frame
+  delay 500
+  part nice_fixpoint
+  set $nogodelay random 100 450 50
+  set $resttime expression 500 - $nogodelay
+  show bitmap @2 # the arrow
+  readkey @3 $nogodelay # 'wait' until nogo delay is over
+  set $rt1 RT
+  set $status1 STATUS
+  ## there are two possibilities:
+  ## 1: Person has not yet responded
+  ## 2: Person has responded, i.e., before stop signal, so that would be correct
+  if $status1 == TIMEOUT ### only if button NOT pressed show NOGO stimulus
+    clear -1
+    show bitmap @4 # the stop signal
+    readkey @3 $resttime # the remaining time up to 500 ms
+    clear -1
+  fi
+  ### now stimulus/response stuff done, check whether mistake was made
+  if $status1 == CORRECT
+    clear -1
+  fi
+  if $status1 != TIMEOUT && $status1 != CORRECT
+    show bitmap wrongkey
+    delay 2000
+    clear -1
+    set $trialcorrect 0    
+  fi
+  if $status1 == TIMEOUT && STATUS != TIMEOUT
+    show bitmap shouldnothavepressed1
+    delay 250
+    clear -1
+    show bitmap shouldnothavepressed2
+    delay 250
+    clear -1
+    show bitmap shouldnothavepressed1
+    delay 250
+    clear -1
+    show bitmap shouldnothavepressed2
+    delay 250
+    clear -1
+    show bitmap shouldnothavepressed1
+    delay 250
+    clear -1
+    set $trialcorrect 0
+  fi
+  delay &iti
+  save @1 $nogodelay $rt1 $status1 RT STATUS $trialcorrect
+
+block baseline
+  message instruction1
+  tasklist
+    go 20 allcorrect 50
+  end
+  feedback
+    text 0 0 "Average response time in milliseconds"
+    set &MyRT mean c4 ; postfix "ms" ; select c5 == 1
+    text 0 50 &MyRT ; postfix "ms"
+  end
+   
+block stopgo
+  message instruction2
+  tasklist
+    go 30
+    nogo 10
+  end
